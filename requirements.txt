@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+streamlit
+python-multipart
+groq
+pymongo
+langchain-groq
+langchain-core
+langgraph
+langchain-mongodb
+python-dotenv
+audio-recorder-streamlit
