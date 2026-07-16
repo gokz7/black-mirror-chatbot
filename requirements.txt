@@ -13,14 +13,13 @@ langchain-mongodb
 langchain-text-splitters
 langgraph
 langgraph-prebuilt
+openai
 
 # Database & Data
 pymongo
 pydantic
 pydantic-settings
-pymongo
-langchain-mongodb
+
 # Utilities
 python-dotenv
 requests
-openai
