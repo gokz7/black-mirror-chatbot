@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+groq
+langchain
+langchain-core
+langchain-community
+langchain-groq
+langchain-mongodb
+langchain-text-splitters
+langgraph
+langgraph-prebuilt
+openai
+pymongo
+pydantic
+pydantic-settings
+python-dotenv
+requests
