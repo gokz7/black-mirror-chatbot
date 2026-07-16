@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import shutil
@@ -33,6 +34,16 @@ else:
 app = FastAPI(
     title="Black Mirror API Gateway", 
     description="FastAPI backend managing session states, RAG, Voice, and Security."
+)
+
+# --- CORS SETUP ---
+# This allows your Streamlit frontend to communicate with this FastAPI backend.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace "*" with your specific Streamlit URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class ChatRequest(BaseModel):

@@ -18,8 +18,8 @@ langgraph-prebuilt
 pymongo
 pydantic
 pydantic-settings
-faiss-cpu
-
+pymongo
+langchain-mongodb
 # Utilities
 python-dotenv
 requests
