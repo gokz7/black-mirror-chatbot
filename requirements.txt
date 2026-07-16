@@ -23,3 +23,5 @@ pydantic-settings
 # Utilities
 python-dotenv
 requests
+
+# Force rebuild trigger
