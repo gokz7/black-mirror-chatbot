@@ -1,7 +1,3 @@
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo import MongoClient
 import os
 
@@ -10,6 +6,14 @@ def process_and_index_pdf(pdf_file_path):
     Takes a PDF file, extracts the text, chunks it into manageable pieces,
     converts them to dense vectors, and stores them in MongoDB Atlas.
     """
+    # Heavy imports deferred to inside the function: this keeps server
+    # startup fast (Uvicorn binds the port immediately) and only pays the
+    # torch/sentence-transformers loading cost when a PDF is actually uploaded.
+    from langchain_community.document_loaders import PyPDFLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_mongodb import MongoDBAtlasVectorSearch
+
     # 1. Extract Text from PDF
     loader = PyPDFLoader(pdf_file_path)
     documents = loader.load()
@@ -45,6 +49,9 @@ def get_faiss_retriever():
     Loads the MongoDB Vector Search so the LangGraph AI can search it.
     (Kept the function name as 'get_faiss_retriever' so it doesn't break graph.py!)
     """
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_mongodb import MongoDBAtlasVectorSearch
+
     embeddings = HuggingFaceEmbeddings(
         model_name='sentence-transformers/all-MiniLM-L6-v2',
         model_kwargs={'device': 'cpu'}
