@@ -1,9 +1,22 @@
 from pymongo import MongoClient
 import os
 
-# Cache the embeddings model so it only loads once per running server,
-# not once per request. Avoids repeatedly paying torch's load cost/memory.
+# Cache both the Mongo connection and the embeddings model so they're
+# created once per running server, not once per request. A fresh
+# MongoClient on a mongodb+srv:// URI triggers a new DNS SRV lookup every
+# time, which is unnecessary overhead and an occasional source of slow
+# or hanging requests under constrained resources.
+_mongo_client = None
 _embeddings_instance = None
+
+def _get_mongo_client():
+    global _mongo_client
+    if _mongo_client is None:
+        _mongo_client = MongoClient(
+            os.getenv("MONGODB_URI"),
+            serverSelectionTimeoutMS=5000  # fail fast with a clear error instead of hanging near 30s
+        )
+    return _mongo_client
 
 def _get_embeddings():
     global _embeddings_instance
@@ -21,7 +34,7 @@ def has_indexed_documents():
     no torch. Lets graph.py decide whether RAG retrieval is even worth
     attempting before paying the cost of loading the embedding model.
     """
-    client = MongoClient(os.getenv("MONGODB_URI"))
+    client = _get_mongo_client()
     collection = client["black_mirror_db"]["pdf_vectors"]
     return collection.count_documents({}) > 0
 
@@ -49,7 +62,7 @@ def process_and_index_pdf(pdf_file_path):
     embeddings = _get_embeddings()
 
     # 4. Build the MongoDB Vector Database (dedicated collection, separate from audit logs)
-    client = MongoClient(os.getenv("MONGODB_URI"))
+    client = _get_mongo_client()
     collection = client["black_mirror_db"]["pdf_vectors"]
 
     MongoDBAtlasVectorSearch.from_documents(
@@ -71,7 +84,7 @@ def get_faiss_retriever():
 
     embeddings = _get_embeddings()
 
-    client = MongoClient(os.getenv("MONGODB_URI"))
+    client = _get_mongo_client()
     collection = client["black_mirror_db"]["pdf_vectors"]
 
     vector_store = MongoDBAtlasVectorSearch(
