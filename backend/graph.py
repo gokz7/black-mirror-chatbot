@@ -10,8 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, trim_messages
 
-# Import your MongoDB Atlas retriever from the utils file you built
-from utils import get_faiss_retriever
+from utils import get_faiss_retriever, has_indexed_documents
 
 # Load environment variables (from .env locally; no-op on Render, which injects env vars directly)
 load_dotenv()
@@ -41,13 +40,16 @@ def chatbot_node(state: State):
     # 1. Get the user's exact question
     user_message = state["messages"][-1].content
 
-    # 2. Attempt retrieval from MongoDB Atlas Vector Search (empty context if nothing indexed yet)
+    # 2. Only attempt retrieval (and only load the embedding model) if
+    #    something has actually been indexed. This keeps ordinary chat
+    #    messages cheap and avoids loading torch on every single request.
     context = ""
     try:
-        retriever = get_faiss_retriever()
-        docs = retriever.invoke(user_message)
-        if docs:
-            context = "\n\n".join([doc.page_content for doc in docs])
+        if has_indexed_documents():
+            retriever = get_faiss_retriever()
+            docs = retriever.invoke(user_message)
+            if docs:
+                context = "\n\n".join([doc.page_content for doc in docs])
     except Exception as e:
         print(f"Retrieval skipped/error: {e}")
 

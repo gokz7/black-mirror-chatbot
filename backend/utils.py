@@ -1,17 +1,37 @@
 from pymongo import MongoClient
 import os
 
+# Cache the embeddings model so it only loads once per running server,
+# not once per request. Avoids repeatedly paying torch's load cost/memory.
+_embeddings_instance = None
+
+def _get_embeddings():
+    global _embeddings_instance
+    if _embeddings_instance is None:
+        from langchain_huggingface import HuggingFaceEmbeddings
+        _embeddings_instance = HuggingFaceEmbeddings(
+            model_name='sentence-transformers/all-MiniLM-L6-v2',
+            model_kwargs={'device': 'cpu'}
+        )
+    return _embeddings_instance
+
+def has_indexed_documents():
+    """
+    Cheap check using plain pymongo only — no LangChain, no embeddings,
+    no torch. Lets graph.py decide whether RAG retrieval is even worth
+    attempting before paying the cost of loading the embedding model.
+    """
+    client = MongoClient(os.getenv("MONGODB_URI"))
+    collection = client["black_mirror_db"]["pdf_vectors"]
+    return collection.count_documents({}) > 0
+
 def process_and_index_pdf(pdf_file_path):
     """
     Takes a PDF file, extracts the text, chunks it into manageable pieces,
     converts them to dense vectors, and stores them in MongoDB Atlas.
     """
-    # Heavy imports deferred to inside the function: this keeps server
-    # startup fast (Uvicorn binds the port immediately) and only pays the
-    # torch/sentence-transformers loading cost when a PDF is actually uploaded.
     from langchain_community.document_loaders import PyPDFLoader
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_huggingface import HuggingFaceEmbeddings
     from langchain_mongodb import MongoDBAtlasVectorSearch
 
     # 1. Extract Text from PDF
@@ -25,11 +45,8 @@ def process_and_index_pdf(pdf_file_path):
     )
     texts = text_splitter.split_documents(documents)
 
-    # 3. Generate Embeddings using a fast, free local transformer model
-    embeddings = HuggingFaceEmbeddings(
-        model_name='sentence-transformers/all-MiniLM-L6-v2',
-        model_kwargs={'device': 'cpu'}
-    )
+    # 3. Generate Embeddings using the cached model
+    embeddings = _get_embeddings()
 
     # 4. Build the MongoDB Vector Database (dedicated collection, separate from audit logs)
     client = MongoClient(os.getenv("MONGODB_URI"))
@@ -48,14 +65,11 @@ def get_faiss_retriever():
     """
     Loads the MongoDB Vector Search so the LangGraph AI can search it.
     (Kept the function name as 'get_faiss_retriever' so it doesn't break graph.py!)
+    Only call this after confirming has_indexed_documents() is True.
     """
-    from langchain_huggingface import HuggingFaceEmbeddings
     from langchain_mongodb import MongoDBAtlasVectorSearch
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name='sentence-transformers/all-MiniLM-L6-v2',
-        model_kwargs={'device': 'cpu'}
-    )
+    embeddings = _get_embeddings()
 
     client = MongoClient(os.getenv("MONGODB_URI"))
     collection = client["black_mirror_db"]["pdf_vectors"]
